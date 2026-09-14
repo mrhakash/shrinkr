@@ -1,0 +1,25 @@
+{
+  "name": "@shrinkr/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild-dev.mjs",
+    "build": "tsc -b tsconfig.json && node esbuild-build.mjs",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "preview": "node esbuild-preview.mjs",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3"
+  }
+}
