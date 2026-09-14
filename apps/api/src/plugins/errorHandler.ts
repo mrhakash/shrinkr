@@ -1,7 +1,8 @@
+import fp from 'fastify-plugin';
 import type { FastifyError, FastifyInstance, FastifyReply } from 'fastify';
 import { AppError } from '../util/errors.js';
 
-export function errorHandlerPlugin(app: FastifyInstance, _opts: unknown, done: (err?: Error) => void): void {
+async function handler(app: FastifyInstance): Promise<void> {
   app.setErrorHandler((err: FastifyError | AppError, _req, reply: FastifyReply) => {
     if (err instanceof AppError) {
       reply.status(err.statusCode).send({ error: err.code, message: err.message });
@@ -20,5 +21,7 @@ export function errorHandlerPlugin(app: FastifyInstance, _opts: unknown, done: (
       ...(validation ? { validation } : {}),
     });
   });
-  done();
 }
+
+// fastify-plugin: register at root scope so the handler applies to ALL routes
+export const errorHandlerPlugin = fp(handler, { name: 'error-handler' });

@@ -2,6 +2,7 @@ import { openDatabase, migrate, seedPlans } from '../src/db/index.js';
 import { buildApp } from '../src/app.js';
 import type { FastifyInstance } from 'fastify';
 import type { DB } from '../src/db/index.js';
+import { randomUUID } from 'node:crypto';
 
 export interface TestApp {
   app: FastifyInstance;
@@ -12,7 +13,12 @@ export async function makeApp(opts?: { seedAdminEmail?: string }): Promise<TestA
   const db = openDatabase(':memory:');
   migrate(db);
   seedPlans(db);
-  const app = await buildApp({ db, logger: false, seedAdminEmail: opts?.seedAdminEmail });
+  // Per-app unique rate-limit key so parallel tests never share buckets.
+  const appKey = randomUUID();
+  const app = await buildApp({
+    db, logger: false, seedAdminEmail: opts?.seedAdminEmail,
+    rateLimitKey: () => appKey,
+  });
   return { app, db };
 }
 

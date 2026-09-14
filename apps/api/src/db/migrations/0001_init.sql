@@ -55,7 +55,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_one_active
 CREATE TABLE IF NOT EXISTS links (
   id TEXT PRIMARY KEY,
   org_id TEXT NOT NULL REFERENCES organizations(id),
-  slug TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL,
   target_url TEXT NOT NULL,
   title TEXT,
   total_clicks INTEGER NOT NULL DEFAULT 0,
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS links (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_links_slug_active ON links (slug) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_links_org ON links (org_id);
 
 CREATE TABLE IF NOT EXISTS clicks (

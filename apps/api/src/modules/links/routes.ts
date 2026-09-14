@@ -109,30 +109,24 @@ export async function linkRoutes(app: FastifyInstance, opts: { db: DB }): Promis
     const plan = getActivePlan(db, row.org_id);
     const now = nowIso();
     const cap = plan.maxClicksTrackedPerLink;
+    const referrer = typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 512) : null;
+    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 256) : null;
+    const ipHash = createHash('sha256').update(req.ip ?? '').digest('hex').slice(0, 16);
     const tx = db.transaction(() => {
       db.prepare('UPDATE links SET total_clicks = total_clicks + 1 WHERE id = ?').run(row.id);
       const count = (db.prepare('SELECT COUNT(*) AS c FROM clicks WHERE link_id = ?').get(row.id) as { c: number }).c;
-      if (count < cap) {
+      // Insert the new click first, then prune to cap (handles growth AND plan downgrades)
+      db.prepare(
+        `INSERT INTO clicks (id, org_id, link_id, occurred_at, referrer, user_agent, ip_hash)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(newId(), row.org_id, row.id, now, referrer, userAgent, ipHash);
+      if (count + 1 > cap) {
+        const excess = count + 1 - cap;
         db.prepare(
-          `INSERT INTO clicks (id, org_id, link_id, occurred_at, referrer, user_agent, ip_hash)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          newId(), row.org_id, row.id, now,
-          typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 512) : null,
-          typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 256) : null,
-          createHash('sha256').update(req.ip ?? '').digest('hex').slice(0, 16)
-        );
-      } else {
-        db.prepare('DELETE FROM clicks WHERE link_id = ? AND id IN (SELECT id FROM clicks WHERE link_id = ? ORDER BY occurred_at ASC LIMIT 1)').run(row.id, row.id);
-        db.prepare(
-          `INSERT INTO clicks (id, org_id, link_id, occurred_at, referrer, user_agent, ip_hash)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          newId(), row.org_id, row.id, now,
-          typeof req.headers.referer === 'string' ? req.headers.referer.slice(0, 512) : null,
-          typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 256) : null,
-          createHash('sha256').update(req.ip ?? '').digest('hex').slice(0, 16)
-        );
+          `DELETE FROM clicks WHERE id IN (
+             SELECT id FROM clicks WHERE link_id = ? ORDER BY occurred_at ASC LIMIT ?
+           )`
+        ).run(row.id, excess);
       }
     });
     tx();

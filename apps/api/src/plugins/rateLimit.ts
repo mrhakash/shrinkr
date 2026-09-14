@@ -1,8 +1,19 @@
+import type { FastifyRequest } from 'fastify';
+
 interface Bucket { count: number; resetAt: number }
 
 const buckets = new Map<string, Bucket>();
 
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+type KeyFn = (req: FastifyRequest) => string;
+let keyFn: KeyFn = (req) => req.ip;
+
+/** Tests override this to key per-request; production default keys by client IP. */
+export function setRateLimitKeyFn(fn: KeyFn): void {
+  keyFn = fn;
+}
+
+export function rateLimit(scope: string, req: FastifyRequest, limit: number, windowMs: number): boolean {
+  const key = `${scope}:${keyFn(req)}`;
   const now = Date.now();
   const b = buckets.get(key);
   if (!b || b.resetAt < now) {

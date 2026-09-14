@@ -34,14 +34,16 @@ export async function adminRoutes(app: FastifyInstance, opts: { db: DB }): Promi
 
   app.post<{ Params: { id: string } }>('/api/admin/orgs/:id/suspend', async (req) => {
     const admin = requirePlatformAdmin(req);
-    db.prepare("UPDATE organizations SET status = 'suspended', updated_at = ? WHERE id = ? AND deleted_at IS NULL").run(nowIso(), req.params.id);
+    const r = db.prepare("UPDATE organizations SET status = 'suspended', updated_at = ? WHERE id = ? AND deleted_at IS NULL").run(nowIso(), req.params.id);
+    if (r.changes === 0) throw Errors.notFound();
     audit(db, { orgId: req.params.id, actorUserId: admin.id, action: 'org.suspended', targetType: 'org', targetId: req.params.id });
     return { ok: true };
   });
 
   app.post<{ Params: { id: string } }>('/api/admin/orgs/:id/resume', async (req) => {
     const admin = requirePlatformAdmin(req);
-    db.prepare("UPDATE organizations SET status = 'active', updated_at = ? WHERE id = ? AND deleted_at IS NULL").run(nowIso(), req.params.id);
+    const r = db.prepare("UPDATE organizations SET status = 'active', updated_at = ? WHERE id = ? AND deleted_at IS NULL").run(nowIso(), req.params.id);
+    if (r.changes === 0) throw Errors.notFound();
     audit(db, { orgId: req.params.id, actorUserId: admin.id, action: 'org.resumed', targetType: 'org', targetId: req.params.id });
     return { ok: true };
   });

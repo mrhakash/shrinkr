@@ -15,10 +15,19 @@ export interface AppOptions {
   cookieSecret?: string;
   seedAdminEmail?: string;
   logger?: boolean;
+  /** Override the rate-limit client key (tests). Production default: ip. */
+  rateLimitKey?: (req: { ip: string; headers: Record<string, unknown> }) => string;
 }
 
+import { setRateLimitKeyFn } from './plugins/rateLimit.js';
+
 export async function buildApp(opts: AppOptions) {
-  const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
+  const app = Fastify({
+    logger: opts.logger ?? false,
+    // Trust proxy only when an explicit web origin is configured (production behind a proxy).
+    // In tests/dev without webOrigin we do NOT trust X-Forwarded-For, preventing rate-limit bypass.
+    trustProxy: Boolean(opts.webOrigin),
+  });
   await app.register(cookie, { secret: opts.cookieSecret ?? 'dev-insecure' });
   await app.register(cors, {
     origin: opts.webOrigin ?? true,
@@ -26,6 +35,7 @@ export async function buildApp(opts: AppOptions) {
   });
 
   app.get('/health', async () => ({ ok: true, name: 'shrinkr', version: '1.0.0' }));
+  if (opts.rateLimitKey) setRateLimitKeyFn(opts.rateLimitKey);
 
   await app.register(errorHandlerPlugin);
   await app.register(authPlugin, { db: opts.db });

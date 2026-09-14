@@ -16,7 +16,7 @@ export async function authRoutes(app: FastifyInstance, opts: { db: DB; seedAdmin
   const { db, seedAdminEmail } = opts;
 
   app.post<{ Body: SignupBody }>('/api/auth/signup', async (req, reply) => {
-    if (!rateLimit(`signup:${req.ip}`, 10, 60_000)) throw Errors.tooMany();
+    if (!rateLimit('signup', req, 10, 60_000)) throw Errors.tooMany();
     const { email, password, name } = req.body ?? {};
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw Errors.badRequest('Valid email required');
     if (!password || password.length < 8) throw Errors.badRequest('Password must be at least 8 characters');
@@ -55,13 +55,13 @@ export async function authRoutes(app: FastifyInstance, opts: { db: DB; seedAdmin
     audit(db, { orgId, actorUserId: userId, action: 'auth.signup', targetType: 'user', targetId: userId });
     const { token, expiresAt } = createSession(db, userId);
     reply.setCookie(SESSION_COOKIE, token, {
-      path: '/', httpOnly: true, sameSite: 'lax', expires: new Date(expiresAt),
+      path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', expires: new Date(expiresAt),
     });
     return { user: { id: userId, email: lower, name: name.trim(), isPlatformAdmin } };
   });
 
   app.post<{ Body: LoginBody }>('/api/auth/login', async (req, reply) => {
-    if (!rateLimit(`login:${req.ip}`, 10, 60_000)) throw Errors.tooMany();
+    if (!rateLimit('login', req, 10, 60_000)) throw Errors.tooMany();
     const { email, password } = req.body ?? {};
     if (!email || !password) throw Errors.badRequest('Email and password required');
     const row = db
@@ -73,7 +73,7 @@ export async function authRoutes(app: FastifyInstance, opts: { db: DB; seedAdmin
     if (!ok) throw Errors.unauthorized('Invalid email or password');
     const { token, expiresAt } = createSession(db, row!.id);
     reply.setCookie(SESSION_COOKIE, token, {
-      path: '/', httpOnly: true, sameSite: 'lax', expires: new Date(expiresAt),
+      path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', expires: new Date(expiresAt),
     });
     return {
       user: { id: row!.id, email: row!.email, name: row!.name, isPlatformAdmin: row!.is_platform_admin === 1 },
