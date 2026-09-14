@@ -24,9 +24,10 @@ import { setRateLimitKeyFn } from './plugins/rateLimit.js';
 export async function buildApp(opts: AppOptions) {
   const app = Fastify({
     logger: opts.logger ?? false,
-    // Trust proxy only when an explicit web origin is configured (production behind a proxy).
-    // In tests/dev without webOrigin we do NOT trust X-Forwarded-For, preventing rate-limit bypass.
-    trustProxy: Boolean(opts.webOrigin),
+    // Trust exactly one proxy hop only when an explicit web origin is configured
+    // (production behind a reverse proxy). Direct client connections then cannot
+    // forge X-Forwarded-For beyond one hop; tests/dev unset webOrigin → no trust.
+    trustProxy: opts.webOrigin ? 1 : false,
   });
   await app.register(cookie, { secret: opts.cookieSecret ?? 'dev-insecure' });
   await app.register(cors, {
